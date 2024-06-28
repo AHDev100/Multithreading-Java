@@ -4,20 +4,74 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Multithreaded Solution - Partition the image
+ * Break up the image into as many parts as we have threads
+ * Allocate each thread to process only it's portion
+ * Then we save the image buffer once the threads are all done
+ */
 
 public class Main {
-    public static final String SOURCE_FILE = "./resources/man-flowers.jpg";
-    public static final String DESTINATION_FILE = "./out/many-flowers.jpg";
+    public static final String DESTINATION_FILE = "src/main/java/thread/performance/latency/out/many-flowers-purple.jpg";
 
     public static void main(String[] args) throws IOException {
-        BufferedImage originalImage = ImageIO.read(new File(SOURCE_FILE));
+        String sourceFile = "src/main/java/thread/performance/latency/many-flowers.jpg";
+
+        BufferedImage originalImage = ImageIO.read(new File(sourceFile));
         BufferedImage resultImage = new BufferedImage(originalImage.getWidth(), originalImage.getHeight(), BufferedImage.TYPE_INT_RGB);
+
+        long startTimeMulti = System.currentTimeMillis();
+        recolorMultiThreaded(originalImage, resultImage, 3);
+        long endTimeMulti = System.currentTimeMillis();
+        System.out.println("Time for multithreaded: " + (endTimeMulti - startTimeMulti));
+
+        File outputFile = new File(DESTINATION_FILE);
+        ImageIO.write(resultImage, "jpg", outputFile);
+    }
+
+    public static void recolorSingleThreaded(BufferedImage originalImage, BufferedImage resultImage){
+        recolorImage(originalImage, resultImage, 0, 0, originalImage.getWidth(), originalImage.getHeight());
+    }
+
+    public static void recolorMultiThreaded(BufferedImage originalImage, BufferedImage resultImage, int numberOfThreads){
+        List<Thread> threads = new ArrayList<>();
+        int width = originalImage.getWidth();
+        int height = originalImage.getHeight();
+
+        for (int i = 0; i < numberOfThreads; i++){
+            final int threadMultiplier = i;
+
+            Thread thread = new Thread(() -> { // Each thread gets its own image partition
+                int leftCorner = 0;
+                int topCorner = height * threadMultiplier;
+
+                recolorImage(originalImage, resultImage, leftCorner, topCorner, width, height);
+            });
+
+            threads.add(thread);
+        }
+
+        for (Thread thread : threads){
+            thread.start();
+        }
+
+        for (Thread thread : threads){
+            try {
+                thread.join();
+            } catch (InterruptedException e){
+            }
+        }
     }
 
     public static void recolorImage(BufferedImage originalImage, BufferedImage resultImage, int leftCorner, int topCorner,
                                     int width, int height){
-        for (int x = leftCorner; x < leftCorner + width; x++){
-            System.out.println("To be continued...");
+        for (int x = leftCorner; x < leftCorner + width && x < originalImage.getWidth(); x++){
+            for (int y = topCorner; y < topCorner + height && y < originalImage.getHeight(); y++){
+                recolorPixel(originalImage, resultImage, x, y);
+            }
         }
     }
 
@@ -36,7 +90,7 @@ public class Main {
         if (isShadeOfGray(red, green, blue)){
             newRed = Math.min(255, red + 10);
             newGreen = Math.max(0, green - 80);
-            newBlue = Math.min(0, blue - 20);
+            newBlue = Math.max(0, blue - 20);
         } else {
             newRed = red;
             newGreen = green;
